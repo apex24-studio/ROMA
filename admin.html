@@ -49,17 +49,58 @@
         
         .btn-success:hover { background: var(--success); color: #000; }
         .btn-danger:hover { background: var(--danger); color: #fff; }
+
+        /* Login UI */
+        .login-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 80vh;
+        }
+        .login-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .login-card h2 { margin-bottom: 25px; }
+        .error-msg { color: var(--danger); margin-top: 15px; display: none; font-size: 0.95rem; font-weight: bold;}
     </style>
 </head>
 <body>
 
     <div class="admin-header">
         <a href="index.html" class="logo">R<span>O</span>MA <span>ADMIN</span></a>
-        <a href="index.html" class="btn btn-primary btn-small">العودة للموقع</a>
+        <div>
+            <button id="logout-btn" class="btn btn-danger btn-small" style="display:none; margin-left:10px;">تسجيل الخروج</button>
+            <a href="index.html" class="btn btn-primary btn-small">العودة للموقع</a>
+        </div>
     </div>
 
-    <div class="admin-container">
-        <h2>إدارة الأجهزة (نسخة تجريبية)</h2>
+    <!-- Login Section -->
+    <div id="login-section" class="login-section">
+        <div class="login-card">
+            <h2>تسجيل الدخول للإدارة</h2>
+            <form id="admin-login-form">
+                <div class="form-group">
+                    <input type="email" id="admin-email" required placeholder="البريد الإلكتروني">
+                </div>
+                <div class="form-group">
+                    <input type="password" id="admin-password" required placeholder="كلمة المرور">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">دخول</button>
+                <div id="login-error" class="error-msg">البريد الإلكتروني أو كلمة المرور غير صحيحة.</div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Section (Hidden by default) -->
+    <div id="admin-section" class="admin-container" style="display: none;">
+        <h2>إدارة الأجهزة</h2>
         <p class="text-muted" style="margin-bottom: 30px;">قم بتغيير حالة الأجهزة من هنا، وستتحدث في الصفحة الرئيسية تلقائياً.</p>
 
         <div id="admin-devices-list">
@@ -68,19 +109,5 @@
     </div>
 
     <script type="module" src="script.js"></script>
-    <script>
-        // Simple password protection simulation
-        document.addEventListener('DOMContentLoaded', () => {
-            const password = prompt("الرجاء إدخال كلمة المرور (للتجربة: 1234)");
-            if (password !== "1234") {
-                document.body.innerHTML = "<h2 style='text-align:center; margin-top: 50px; color: red;'>عذراً، كلمة المرور غير صحيحة ولا يمكنك الدخول.</h2>";
-                return;
-            }
-            window.isAdminAuthenticated = true;
-            if (typeof window.renderAdminConsoles === 'function') {
-                window.renderAdminConsoles();
-            }
-        });
-    </script>
 </body>
 </html>

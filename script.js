@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, onValue, set, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBMRcV2zslPuaJF9jvFCGTpZ8h_dX1iMAM",
@@ -13,6 +14,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app);
 const consolesRef = ref(db, 'consoles');
 
 const initialConsoles = [
@@ -33,7 +35,30 @@ get(consolesRef).then((snapshot) => {
     }
 });
 
-// Listen for realtime changes
+// Authentication State Observer
+onAuthStateChanged(auth, (user) => {
+    const loginSection = document.getElementById('login-section');
+    const adminSection = document.getElementById('admin-section');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    if (user) {
+        window.isAdminAuthenticated = true;
+        if (loginSection) loginSection.style.display = 'none';
+        if (adminSection) adminSection.style.display = 'block';
+        if (logoutBtn) logoutBtn.style.display = 'inline-block';
+        
+        if (typeof window.renderAdminConsoles === 'function') {
+            window.renderAdminConsoles();
+        }
+    } else {
+        window.isAdminAuthenticated = false;
+        if (loginSection) loginSection.style.display = 'flex';
+        if (adminSection) adminSection.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+    }
+});
+
+// Listen for realtime changes (for public and admin)
 onValue(consolesRef, (snapshot) => {
     if (snapshot.exists()) {
         globalConsoles = snapshot.val();
@@ -46,7 +71,7 @@ onValue(consolesRef, (snapshot) => {
 
 function renderConsoles() {
     const container = document.getElementById('consoles-container');
-    if (!container) return; // We are not on the main page
+    if (!container) return;
 
     container.innerHTML = '';
     globalConsoles.forEach(c => {
@@ -94,7 +119,6 @@ window.renderAdminConsoles = function() {
         container.appendChild(row);
     });
 
-    // Attach event listeners safely
     const buttons = container.querySelectorAll('button');
     buttons.forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -109,6 +133,35 @@ function updateStatus(index, newStatus) {
     const specificConsoleRef = ref(db, 'consoles/' + index);
     const updatedConsole = { ...globalConsoles[index], status: newStatus };
     set(specificConsoleRef, updatedConsole);
+}
+
+// Login logic
+const loginForm = document.getElementById('admin-login-form');
+if (loginForm) {
+    loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = document.getElementById('admin-email').value;
+        const password = document.getElementById('admin-password').value;
+        const errorMsg = document.getElementById('login-error');
+        
+        signInWithEmailAndPassword(auth, email, password)
+            .then(() => {
+                errorMsg.style.display = 'none';
+            })
+            .catch((error) => {
+                errorMsg.style.display = 'block';
+                errorMsg.innerText = "البريد الإلكتروني أو كلمة المرور غير صحيحة.";
+                console.error(error);
+            });
+    });
+}
+
+// Logout logic
+const logoutBtn = document.getElementById('logout-btn');
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+        signOut(auth);
+    });
 }
 
 // Handle WhatsApp Booking form
