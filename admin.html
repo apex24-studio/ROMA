@@ -31,32 +31,14 @@
             margin-bottom: 10px;
             border-radius: 8px;
         }
-        .device-info {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-        }
-        .btn-small {
-            padding: 8px 15px;
-            font-size: 0.9rem;
-        }
-        .btn-success { background: rgba(0, 230, 118, 0.2); color: var(--success); border: 1px solid var(--success); }
-        .btn-danger { background: rgba(255, 23, 68, 0.2); color: var(--danger); border: 1px solid var(--danger); }
-        
+        .device-info { display: flex; flex-direction: column; gap: 5px; }
+        .controls { display: flex; gap: 10px; }
+        .btn-small { padding: 8px 15px; font-size: 0.9rem; }
+        .btn-success { background: rgba(0,230,118,0.2); color: var(--success); border: 1px solid var(--success); }
+        .btn-danger  { background: rgba(255,23,68,0.2);  color: var(--danger);  border: 1px solid var(--danger);  }
         .btn-success:hover { background: var(--success); color: #000; }
-        .btn-danger:hover { background: var(--danger); color: #fff; }
-
-        /* Login UI */
-        .login-section {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 80vh;
-        }
+        .btn-danger:hover  { background: var(--danger);  color: #fff; }
+        .login-section { display: flex; justify-content: center; align-items: center; height: 80vh; }
         .login-card {
             background: var(--glass-bg);
             backdrop-filter: blur(12px);
@@ -68,14 +50,13 @@
             text-align: center;
         }
         .login-card h2 { margin-bottom: 25px; }
-        .error-msg { color: var(--danger); margin-top: 15px; display: none; font-size: 0.95rem; font-weight: bold;}
+        .error-msg { color: var(--danger); margin-top: 15px; display: none; font-size: 0.95rem; font-weight: bold; }
         .admin-tabs { display: flex; gap: 10px; margin-bottom: 30px; }
         .admin-tabs .btn { flex: 1; opacity: 0.7; }
         .admin-tabs .btn.active-tab, .admin-tabs .btn:hover { opacity: 1; }
         .timer-controls { display: flex; gap: 5px; align-items: center; margin-top: 10px; }
         .timer-controls input { width: 60px; padding: 5px; border-radius: 5px; border: 1px solid var(--glass-border); background: var(--bg-main); color: white; }
         .timer-display { font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: var(--accent-neon); margin-top: 5px; }
-        
         .booking-card { background: var(--glass-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--glass-border); margin-bottom: 15px; }
         .booking-card h4 { margin-bottom: 10px; color: var(--accent-neon); }
         .booking-card p { margin-bottom: 5px; font-size: 0.9rem; }
@@ -111,10 +92,10 @@
 
     <!-- Admin Section (Hidden by default) -->
     <div id="admin-section" class="admin-container" style="display: none;">
-        
+
         <div class="admin-tabs">
-            <button id="devices-tab-btn" class="btn btn-primary active-tab" onclick="document.getElementById('devices-tab').style.display='block'; document.getElementById('bookings-tab').style.display='none'; document.getElementById('devices-tab-btn').classList.add('active-tab'); document.getElementById('bookings-tab-btn').classList.remove('active-tab');">إدارة الأجهزة</button>
-            <button id="bookings-tab-btn" class="btn btn-primary" onclick="document.getElementById('devices-tab').style.display='none'; document.getElementById('bookings-tab').style.display='block'; document.getElementById('bookings-tab-btn').classList.add('active-tab'); document.getElementById('devices-tab-btn').classList.remove('active-tab');">إدارة الحجوزات</button>
+            <button id="devices-tab-btn" class="btn btn-primary active-tab" onclick="window.switchTab('devices')">إدارة الأجهزة</button>
+            <button id="bookings-tab-btn" class="btn btn-primary" onclick="window.switchTab('bookings')">إدارة الحجوزات</button>
         </div>
 
         <div id="devices-tab">
@@ -134,6 +115,31 @@
         </div>
     </div>
 
-    <script type="module" src="script.js"></script>
+    <!-- Load app logic FIRST (non-module) -->
+    <script src="app.js"></script>
+
+    <!-- Then Firebase as module, which calls window.initApp -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue, set, get, push, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBMRcV2zslPuaJF9jvFCGTpZ8h_dX1iMAM",
+            authDomain: "roma-ec876.firebaseapp.com",
+            projectId: "roma-ec876",
+            storageBucket: "roma-ec876.firebasestorage.app",
+            messagingSenderId: "726892580200",
+            appId: "1:726892580200:web:cf7957da900a5ce5f51add"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        window.initApp({
+            db: getDatabase(app),
+            auth: getAuth(app),
+            ref, onValue, set, get, push, update,
+            signInWithEmailAndPassword, signOut, onAuthStateChanged
+        });
+    </script>
 </body>
 </html>

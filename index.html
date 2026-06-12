@@ -144,6 +144,31 @@
         </div>
     </footer>
 
-    <script type="module" src="script.js"></script>
+    <!-- Load app logic FIRST (non-module) -->
+    <script src="app.js"></script>
+
+    <!-- Then Firebase as module, which calls window.initApp -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue, set, get, push, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBMRcV2zslPuaJF9jvFCGTpZ8h_dX1iMAM",
+            authDomain: "roma-ec876.firebaseapp.com",
+            projectId: "roma-ec876",
+            storageBucket: "roma-ec876.firebasestorage.app",
+            messagingSenderId: "726892580200",
+            appId: "1:726892580200:web:cf7957da900a5ce5f51add"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        window.initApp({
+            db: getDatabase(app),
+            auth: getAuth(app),
+            ref, onValue, set, get, push, update,
+            signInWithEmailAndPassword, signOut, onAuthStateChanged
+        });
+    </script>
 </body>
 </html>
