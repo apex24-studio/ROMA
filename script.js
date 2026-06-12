@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, onValue, set, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, onValue, set, get, push, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -457,7 +457,6 @@ if (paymentMethodSelect) {
     }
 }
 
-import { push, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 const bookingsRef = ref(db, 'bookings');
 
 if (bookingForm) {
