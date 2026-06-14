@@ -282,6 +282,10 @@ function renderAdminConsoles() {
                     <button class="btn btn-small btn-danger" onclick="window.setStatus(${index},'busy')">مشغول</button>
                 </div>
                 <div class="timer-controls">
+                    <select id="play-mode-${index}" style="padding:4px;border-radius:4px;border:1px solid #ccc;background:#1a1a1a;color:#fff;">
+                        <option value="single">فردي/زوجي</option>
+                        <option value="multi">مالتي (4 أفراد)</option>
+                    </select>
                     <input type="number" id="hours-${index}" placeholder="ساعة" min="0" value="0">
                     <input type="number" id="mins-${index}" placeholder="دقيقة" min="0" max="59" value="0">
                     <button class="btn btn-small btn-primary" onclick="window.startTimer(${index})">بدء العداد</button>
@@ -425,7 +429,8 @@ function renderAdminBookings() {
                         const remainingMs = Math.max(0, fullBookingEndMs - now);
                         if (remainingMs > 60000) {
                             const remainingMins = Math.floor(remainingMs / 60000);
-                            const fullCost = (PRICES[b.deviceType] || 50) * b.duration;
+                            const pricePerHour = (b.playMode === 'multi') ? 50 : (PRICES[b.deviceType] || 40);
+                            const fullCost = pricePerHour * b.duration;
                             extendBtnHtml = `
                                 <div style="background: rgba(0,210,255,0.08); border: 1px solid var(--accent-neon); border-radius: 8px; padding: 10px; margin: 8px 0;">
                                     <p style="color: var(--accent-neon); font-weight: bold; margin-bottom: 8px;">
@@ -443,10 +448,12 @@ function renderAdminBookings() {
                 const card = document.createElement('div');
                 card.className = 'booking-card';
                 card.innerHTML = `
-                    <h4>${b.name} (${b.duration} ساعة)</h4>
+                    <h4>${b.name}</h4>
                     <p><strong>رقم الهاتف:</strong> <a href="tel:${b.phone || ''}" style="color: var(--accent-neon); text-decoration: none; font-weight: bold;">${b.phone || 'غير مسجل'}</a> ${b.phone ? `<a href="https://wa.me/${b.phone.startsWith('0') ? '20' + b.phone.substring(1) : b.phone}" target="_blank" style="margin-right: 15px; color: #25D366; text-decoration: none; font-weight: bold;"><i class="fab fa-whatsapp"></i> واتساب</a>` : ''}</p>
-                    <p><strong>الوقت المحجوز:</strong> ${new Date(b.startTime).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</p>
-                    <p><strong>طريقة الدفع:</strong> ${b.paymentMethod} - <strong>العربون:</strong> ${b.depositAmount} جنيه</p>
+                    <p><strong>موعد الحجز:</strong> ${new Date(b.startTime).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</p>
+                    <p><strong>مدة الحجز:</strong> ${b.duration === 'open' ? 'مفتوح' : b.duration + ' ساعة'}</p>
+                    <p><strong>طريقة الدفع:</strong> ${b.paymentMethod === 'vodafone' ? 'فودافون كاش' : b.paymentMethod === 'instapay' ? 'إنستاباي' : 'في المحل'} ${b.depositAmount > 0 ? `(عربون: ${b.depositAmount} ج)` : ''}</p>
+                    <p><strong>وضع اللعب:</strong> ${b.playMode === 'multi' ? 'مالتي (4 أفراد)' : 'فردي/زوجي'}</p>
                     <p><strong>الحالة:</strong> ${statusMap[b.status] || b.status}</p>
                     ${extendBtnHtml}
                     <div class="booking-actions">
@@ -498,19 +505,22 @@ window.startTimer = function(index) {
     const deviceType = c.type;
     const specificDevice = c.name;
     const roomType = c.location;
-    const pricePerHour = PRICES[deviceType] || 50;
+    const playModeEl = document.getElementById(`play-mode-${index}`);
+    const playMode = playModeEl ? playModeEl.value : 'single';
     
     let durationHours, totalAmount, endTime;
+    let finalPricePerHour = PRICES[deviceType] || 40;
+    if (playMode === 'multi') finalPricePerHour = 50;
     
     if (isOpen) {
         durationHours = 'open';
-        totalAmount = pricePerHour / 2; // عربون ساعة
+        totalAmount = finalPricePerHour / 2; // عربون ساعة
         endTime = null;
     } else {
         const durationMs = (h * 3600 + m * 60) * 1000;
         durationHours = h + (m / 60);
         endTime = Date.now() + durationMs;
-        totalAmount = pricePerHour * durationHours;
+        totalAmount = finalPricePerHour * durationHours;
     }
 
     const bookingsRef = ref(db, 'bookings');
@@ -523,6 +533,7 @@ window.startTimer = function(index) {
         deviceType: deviceType,
         specificDevice: specificDevice,
         roomType: roomType,
+        playMode: playMode,
         startTime: Date.now(),
         duration: durationHours,
         paymentMethod: 'instore',
@@ -563,7 +574,9 @@ window.stopTimer = function(index) {
         if (booking && c.activeTimer.isOpen && c.activeTimer.startTime) {
             const diffMs = Date.now() - c.activeTimer.startTime;
             const hoursUsed = diffMs / (1000 * 3600);
-            const pricePerHour = PRICES[booking.deviceType] || 50;
+            
+            let pricePerHour = PRICES[booking.deviceType] || 40;
+            if (booking.playMode === 'multi') pricePerHour = 50;
             
             let finalCost = pricePerHour * hoursUsed;
             if (booking.depositAmount && booking.depositAmount > 0) {
@@ -700,7 +713,10 @@ window.extendBookingTime = function(id) {
     } else {
         // نهاية الحجز الكامل من وقت الحجز المجدول
         const fullBookingEndMs = booking.startTime + (booking.duration * 3600 * 1000);
-        const fullCost = (PRICES[booking.deviceType] || 50) * booking.duration;
+        
+        let pricePerHour = PRICES[booking.deviceType] || 40;
+        if (booking.playMode === 'multi') pricePerHour = 50;
+        const fullCost = pricePerHour * booking.duration;
         
         updateConsoleField(consoleIdx, {
             status: 'busy',
