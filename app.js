@@ -40,6 +40,138 @@ function getDayKey(timestamp) {
     return date.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+function getWorkingDayBaseDate() {
+    const now = new Date();
+    const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (now.getHours() < 3) {
+        base.setDate(base.getDate() - 1);
+    }
+    return base;
+}
+
+function isSlotAvailable(startTime, duration, deviceType, specificDevice, roomType) {
+    const start = startTime;
+    const end = startTime + duration * 3600 * 1000;
+    
+    const overlappingBookings = globalBookings.filter(b => {
+        if (b.status !== 'approved' && b.status !== 'active_in_store') return false;
+        
+        const bStart = b.startTime;
+        const bEnd = b.startTime + b.duration * 3600 * 1000;
+        return (start < bEnd && end > bStart);
+    });
+
+    if (specificDevice && specificDevice !== 'any') {
+        const conflict = overlappingBookings.find(b => b.specificDevice === specificDevice);
+        if (conflict) return false;
+    }
+
+    const dbRoomName = roomType === 'Main Hall' ? 'الصالة الرئيسية' : 'غرفة VIP';
+    const matchingDevices = globalConsoles.filter(c => c && c.type === deviceType && c.location === dbRoomName);
+    const totalDevicesCount = matchingDevices.length;
+    
+    const conflictingOverlapping = overlappingBookings.filter(b => {
+        if (b.deviceType !== deviceType) return false;
+        if (b.specificDevice && b.specificDevice !== 'any') {
+            const dev = globalConsoles.find(c => c && c.name === b.specificDevice);
+            return dev && dev.location === dbRoomName;
+        }
+        return b.roomType === roomType;
+    });
+
+    if (conflictingOverlapping.length >= totalDevicesCount) {
+        return false;
+    }
+    
+    return true;
+}
+
+function updateTimeSlotsDropdown() {
+    const timeSel = document.getElementById('time');
+    const deviceTypeEl = document.getElementById('device-type');
+    const specificDeviceEl = document.getElementById('specific-device');
+    const roomTypeEl = document.getElementById('room-type');
+    const durationEl = document.getElementById('duration');
+    
+    if (!timeSel || !deviceTypeEl || !roomTypeEl || !durationEl) return;
+    
+    const deviceType = deviceTypeEl.value;
+    const specificDevice = specificDeviceEl ? specificDeviceEl.value : 'any';
+    const roomType = roomTypeEl.value;
+    const duration = parseInt(durationEl.value) || 1;
+    
+    const previousValue = timeSel.value;
+    timeSel.innerHTML = '';
+    
+    const base = getWorkingDayBaseDate();
+    let hasAvailableSlots = false;
+    
+    // Slots from 12:00 (noon) to 02:00 AM of the next morning.
+    // H represents hours from 12 to 26 (24 = 12 AM next day, 25 = 1 AM, 26 = 2 AM)
+    for (let H = 12; H <= 26; H++) {
+        const slotDate = new Date(base.getTime());
+        let hour = H;
+        if (H >= 24) {
+            slotDate.setDate(slotDate.getDate() + 1);
+            hour = H - 24;
+        }
+        slotDate.setHours(hour, 0, 0, 0);
+        const slotTime = slotDate.getTime();
+        
+        // Don't show past slots
+        if (slotTime < Date.now() - 10 * 60 * 1000) { // 10 mins grace period
+            continue;
+        }
+        
+        // Format label
+        let labelHour = hour;
+        let period = 'م';
+        if (hour === 0) {
+            labelHour = 12;
+            period = 'منتصف الليل';
+        } else if (hour === 12) {
+            labelHour = 12;
+            period = 'ظهراً';
+        } else if (hour > 12) {
+            labelHour = hour - 12;
+            period = 'مساءً';
+        } else {
+            period = 'صباحاً';
+        }
+        const labelStr = `${labelHour.toString().padStart(2, '0')}:00 ${period}`;
+        
+        const available = isSlotAvailable(slotTime, duration, deviceType, specificDevice, roomType);
+        
+        if (available) {
+            const opt = document.createElement('option');
+            opt.value = slotTime.toString();
+            opt.textContent = labelStr;
+            timeSel.appendChild(opt);
+            hasAvailableSlots = true;
+        }
+    }
+    
+    if (!hasAvailableSlots) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'لا توجد أوقات متاحة لهذا التحديد';
+        timeSel.appendChild(opt);
+    } else {
+        const promptOpt = document.createElement('option');
+        promptOpt.value = '';
+        promptOpt.textContent = 'اختر وقت الحجز';
+        promptOpt.disabled = true;
+        timeSel.insertBefore(promptOpt, timeSel.firstChild);
+        
+        if (previousValue && timeSel.querySelector(`option[value="${previousValue}"]`)) {
+            timeSel.value = previousValue;
+        } else {
+            timeSel.value = '';
+        }
+    }
+}
+window.updateTimeSlotsDropdown = updateTimeSlotsDropdown;
+
 function updateSpecificDeviceDropdown() {
     const sel = document.getElementById('specific-device');
     const typeEl = document.getElementById('device-type');
@@ -87,6 +219,7 @@ function renderConsoles() {
         container.appendChild(card);
     });
     updateSpecificDeviceDropdown();
+    updateTimeSlotsDropdown();
 }
 
 function renderAdminConsoles() {
@@ -155,7 +288,8 @@ function renderAdminBookings() {
         'approved': '<span style="color:var(--success)">مؤكد (تم الدفع)</span>',
         'cancelled': '<span style="color:var(--danger)">ملغي</span>',
         'cancelled_noshow': '<span style="color:var(--danger)">ملغي (لم يحضر)</span>',
-        'active_in_store': '<span style="color:var(--success)">نشط الآن</span>'
+        'active_in_store': '<span style="color:var(--success)">نشط الآن</span>',
+        'completed': '<span style="color:var(--text-muted)">مكتمل</span>'
     };
     
     // Sort day keys chronologically descending (newest/today's date on top, older dates below)
@@ -231,14 +365,60 @@ window.startTimer = function(index) {
     const h = parseInt(document.getElementById(`hours-${index}`).value) || 0;
     const m = parseInt(document.getElementById(`mins-${index}`).value) || 0;
     if (h === 0 && m === 0) return alert("أدخل وقت صحيح");
+    
     const durationMs = (h * 3600 + m * 60) * 1000;
-    updateConsoleField(index, {
-        status: 'busy',
-        activeTimer: { endTime: Date.now() + durationMs, durationMinutes: h * 60 + m }
+    const durationHours = h + (m / 60);
+    const endTime = Date.now() + durationMs;
+    
+    const c = globalConsoles[index];
+    if (!c) return;
+    const deviceType = c.type;
+    const specificDevice = c.name;
+    const roomType = c.location === 'الصالة الرئيسية' ? 'Main Hall' : 'VIP Room';
+    const pricePerHour = PRICES[deviceType] || 50;
+    const totalAmount = pricePerHour * durationHours;
+
+    const bookingsRef = ref(db, 'bookings');
+    const newBookingRef = push(bookingsRef);
+    const newBookingId = newBookingRef.key;
+
+    const newBooking = {
+        name: `حجز مباشر - ${c.name}`,
+        phone: 'غير مسجل',
+        deviceType: deviceType,
+        specificDevice: specificDevice,
+        roomType: roomType,
+        startTime: Date.now(),
+        duration: durationHours,
+        paymentMethod: 'instore',
+        depositAmount: totalAmount,
+        status: 'active_in_store',
+        createdAt: Date.now()
+    };
+
+    set(newBookingRef, newBooking).then(() => {
+        updateConsoleField(index, {
+            status: 'busy',
+            activeTimer: { 
+                endTime, 
+                durationMinutes: h * 60 + m,
+                bookingId: newBookingId
+            }
+        });
+    }).catch(err => {
+        console.error("Failed to create walk-in booking:", err);
+        updateConsoleField(index, {
+            status: 'busy',
+            activeTimer: { endTime, durationMinutes: h * 60 + m }
+        });
     });
 };
 
 window.stopTimer = function(index) {
+    const c = globalConsoles[index];
+    if (c && c.activeTimer && c.activeTimer.bookingId) {
+        update(ref(db, `bookings/${c.activeTimer.bookingId}`), { status: 'completed' });
+    }
     updateConsoleField(index, { status: 'available', activeTimer: null });
 };
 
@@ -346,6 +526,9 @@ setInterval(() => {
             if (c && c.status === 'busy' && c.activeTimer && c.activeTimer.endTime) {
                 if (now >= c.activeTimer.endTime) {
                     const consoleRef = ref(db, 'consoles/' + index);
+                    if (c.activeTimer.bookingId) {
+                        update(ref(db, `bookings/${c.activeTimer.bookingId}`), { status: 'completed' });
+                    }
                     set(consoleRef, { ...c, status: 'available', activeTimer: null }).catch(err => {
                         console.warn("Failed to auto-release console:", err);
                     });
@@ -370,7 +553,7 @@ setInterval(() => {
                     if (idx === -1) idx = globalConsoles.findIndex(c => c && c.type === b.deviceType && c.status === 'available');
                     if (idx !== -1) {
                         const durationMs = (b.duration / 2) * 3600 * 1000;
-                        updateConsoleField(idx, { status: 'busy', activeTimer: { endTime: now + durationMs } });
+                        updateConsoleField(idx, { status: 'busy', activeTimer: { endTime: now + durationMs, bookingId: b.id } });
                         update(ref(db, `bookings/${b.id}`), { status: 'active_in_store' });
                     }
                 }
@@ -473,6 +656,7 @@ window.initApp = function(firebaseServices) {
             globalBookings = [];
         }
         if (window._isAdmin) renderAdminBookings();
+        updateTimeSlotsDropdown();
     });
 
     // Login form
@@ -500,10 +684,16 @@ window.initApp = function(firebaseServices) {
         const deviceTypeEl = document.getElementById('device-type');
         const roomTypeEl = document.getElementById('room-type');
         const durationEl = document.getElementById('duration');
+        const specificDeviceEl = document.getElementById('specific-device');
+        
         if (payMethodEl) payMethodEl.addEventListener('change', updatePaymentInstructions);
-        if (deviceTypeEl) deviceTypeEl.addEventListener('change', () => { updatePaymentInstructions(); updateSpecificDeviceDropdown(); });
-        if (roomTypeEl) roomTypeEl.addEventListener('change', () => { updatePaymentInstructions(); updateSpecificDeviceDropdown(); });
-        if (durationEl) durationEl.addEventListener('input', updatePaymentInstructions);
+        if (deviceTypeEl) deviceTypeEl.addEventListener('change', () => { updatePaymentInstructions(); updateSpecificDeviceDropdown(); updateTimeSlotsDropdown(); });
+        if (roomTypeEl) roomTypeEl.addEventListener('change', () => { updatePaymentInstructions(); updateSpecificDeviceDropdown(); updateTimeSlotsDropdown(); });
+        if (durationEl) durationEl.addEventListener('input', () => { updatePaymentInstructions(); updateTimeSlotsDropdown(); });
+        if (specificDeviceEl) specificDeviceEl.addEventListener('change', updateTimeSlotsDropdown);
+
+        // Initial populating of time slots dropdown
+        updateTimeSlotsDropdown();
 
         bookingForm.addEventListener('submit', e => {
             e.preventDefault();
@@ -512,13 +702,15 @@ window.initApp = function(firebaseServices) {
             const deviceType = document.getElementById('device-type').value;
             const specificDevice = document.getElementById('specific-device') ? document.getElementById('specific-device').value : 'any';
             const roomType = document.getElementById('room-type').value;
-            const timeStr = document.getElementById('time').value;
+            const timeVal = document.getElementById('time').value;
+            if (!timeVal) {
+                alert('الرجاء اختيار وقت الحجز');
+                return;
+            }
+            const startTime = parseInt(timeVal);
             const duration = parseInt(document.getElementById('duration').value) || 1;
             const paymentMethod = document.getElementById('payment-method').value;
             const deposit = (PRICES[deviceType] || 50) * duration / 2;
-            const now2 = new Date();
-            const [hrs, mins] = timeStr.split(':');
-            const startTime = new Date(now2.getFullYear(), now2.getMonth(), now2.getDate(), parseInt(hrs), parseInt(mins)).getTime();
 
             push(bookingsRef, {
                 name, phone, deviceType, specificDevice, roomType,
@@ -528,6 +720,7 @@ window.initApp = function(firebaseServices) {
                 const fb = document.getElementById('booking-feedback');
                 if (fb) { fb.style.display = 'block'; fb.style.color = 'var(--success)'; fb.innerText = 'تم تسجيل طلب الحجز بنجاح! الإدارة ستقوم بمراجعته قريباً.'; }
                 bookingForm.reset();
+                updateTimeSlotsDropdown();
                 const instrEl = document.getElementById('payment-instructions');
                 if (instrEl) instrEl.style.display = 'none';
             }).catch(err => { console.error(err); alert('حدث خطأ، يرجى المحاولة لاحقاً.'); });

@@ -52,13 +52,35 @@
         <div class="container">
             <div class="booking-wrapper">
                 <div class="booking-info">
-                    <h2>احجز عن طريق الواتساب</h2>
-                    <p>قم بتحديد تفاصيل حجزك وسنقوم بتحويلك مباشرة إلى الواتساب لتأكيد الحجز مع الإدارة.</p>
-                    <ul class="features">
+                    <h2>احجز عن طريق الموقع</h2>
+                    <p>قم بتحديد تفاصيل حجزك وسنقوم بتسجيل حجزك فوراً وتأكيده مع الإدارة بعد دفع العربون.</p>
+                    <ul class="features" style="margin-bottom: 25px;">
                         <li><i class="fas fa-check-circle"></i> تأكيد فوري</li>
                         <li><i class="fas fa-check-circle"></i> غرف VIP متوفرة</li>
                         <li><i class="fas fa-check-circle"></i> أسعار مميزة</li>
                     </ul>
+                    
+                    <div class="guidelines-card glass-panel" style="border-color: rgba(255, 23, 68, 0.3); padding: 20px; background: rgba(255, 23, 68, 0.02);">
+                        <h3 style="color: var(--accent-neon); margin-bottom: 15px; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;"><i class="fas fa-circle-info"></i> إرشادات الحجز الهامة</h3>
+                        <ul class="booking-guidelines" style="list-style: none; padding: 0;">
+                            <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px; color: var(--danger); font-weight: 900;">
+                                <i class="fas fa-triangle-exclamation" style="margin-top: 4px; flex-shrink: 0;"></i>
+                                <span>تنبيه هام جداً: الحجز لن يتم تأكيده إلا بعد دفع قيمة العربون (نصف قيمة الحجز).</span>
+                            </li>
+                            <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px;">
+                                <i class="fas fa-money-bill-wave" style="color: var(--accent-neon); margin-top: 4px; flex-shrink: 0;"></i>
+                                <span>يمكنك دفع العربون عبر فودافون كاش، إنستا باي، أو نقداً في المحل.</span>
+                            </li>
+                            <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px;">
+                                <i class="fas fa-clock-rotate-left" style="color: var(--accent-neon); margin-top: 4px; flex-shrink: 0;"></i>
+                                <span>لك الحق في استرجاع العربون بالكامل قبل موعد حجزك بـ 5 دقائق على الأقل.</span>
+                            </li>
+                            <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px;">
+                                <i class="fas fa-circle-exclamation" style="color: var(--accent-neon); margin-top: 4px; flex-shrink: 0;"></i>
+                                <span>العربون غير قابل للاسترداد بعد بدء الحجز، ومهلة الحضور تساوي نصف مدة حجزك وتُلغى بعدها.</span>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
                 <div class="booking-form-card glass-panel">
                     <form id="whatsapp-booking-form">
@@ -97,7 +119,9 @@
                         </div>
                         <div class="form-group">
                             <label for="time">وقت الحجز المتوقع (اليوم)</label>
-                            <input type="time" id="time" required>
+                            <select id="time" required>
+                                <option value="">اختر وقت الحجز</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="payment-method">طريقة دفع العربون (نصف المدة)</label>
@@ -137,8 +161,9 @@
             <div class="footer-col">
                 <h3>إرشادات الحجز المسبق</h3>
                 <ul class="booking-guidelines">
+                    <li style="color: var(--danger); font-weight: bold;"><i class="fas fa-triangle-exclamation"></i> تنبيه هام: الحجز لن يتم تأكيده إلا بدفع المال (العربون).</li>
                     <li><i class="fas fa-money-bill-wave"></i> تأكيد الحجز يتطلب دفع نصف قيمة الحجز (عربون).</li>
-                    <li><i class="fas fa-clock-rotate-left"></i> لك الحق في استرجاع العربون بالكامل قبل موعد حجزك بساعة.</li>
+                    <li><i class="fas fa-clock-rotate-left"></i> لك الحق في استرجاع العربون بالكامل قبل موعد حجزك بـ 5 دقائق.</li>
                     <li><i class="fas fa-circle-exclamation"></i> العربون غير قابل للاسترداد بمجرد بدء الحجز، ومهلة الحضور (حفظ الجهاز) تساوي نصف مدة حجزك وتُلغى بعدها.</li>
                 </ul>
             </div>
