@@ -309,7 +309,8 @@ function renderAdminBookings() {
         let dayTotalMoney = 0;
         
         bookingsInDay.forEach(b => {
-            if (b.status !== 'cancelled' && b.status !== 'cancelled_noshow') {
+            // احتساب المبالغ: الحجوزات المؤكدة، النشطة، المكتملة، والملغاة لعدم الحضور (دفعوا العربون)
+            if (b.status === 'approved' || b.status === 'active_in_store' || b.status === 'completed' || b.status === 'cancelled_noshow') {
                 dayTotalHours += b.duration;
                 const price = PRICES[b.deviceType] || 50;
                 dayTotalMoney += (price * b.duration);
@@ -364,14 +365,36 @@ function renderAdminBookings() {
             content.appendChild(groupHeader);
             
             deviceGroups[deviceKey].forEach(b => {
+                const now = Date.now();
+                const isReadyToActivate = b.status === 'approved' && now >= b.startTime;
+                const gracePeriodMs = (b.duration / 2) * 3600 * 1000;
+                const timeUntilStart = b.startTime - now;
+                const timeUntilNoShow = (b.startTime + gracePeriodMs) - now;
+                
+                let arrivalBtnHtml = '';
+                if (isReadyToActivate) {
+                    const minsLeft = Math.max(0, Math.floor(timeUntilNoShow / 60000));
+                    arrivalBtnHtml = `
+                        <div style="background: rgba(0,230,118,0.08); border: 1px solid var(--success); border-radius: 8px; padding: 10px; margin: 8px 0;">
+                            <p style="color: var(--success); font-weight: bold; margin-bottom: 8px;">
+                                <i class="fas fa-user-check"></i> العميل وصل؟ مهلة الحضور تنتهي بعد ${minsLeft} دقيقة
+                            </p>
+                            <button class="btn btn-small btn-success" onclick="window.activateBooking('${b.id}')">
+                                <i class="fas fa-play"></i> بدء الحجز الآن
+                            </button>
+                        </div>
+                    `;
+                }
+                
                 const card = document.createElement('div');
                 card.className = 'booking-card';
                 card.innerHTML = `
                     <h4>${b.name} (${b.duration} ساعة)</h4>
                     <p><strong>رقم الهاتف:</strong> <a href="tel:${b.phone || ''}" style="color: var(--accent-neon); text-decoration: none; font-weight: bold;">${b.phone || 'غير مسجل'}</a> ${b.phone ? `<a href="https://wa.me/${b.phone.startsWith('0') ? '20' + b.phone.substring(1) : b.phone}" target="_blank" style="margin-right: 15px; color: #25D366; text-decoration: none; font-weight: bold;"><i class="fab fa-whatsapp"></i> واتساب</a>` : ''}</p>
-                    <p><strong>الوقت:</strong> ${new Date(b.startTime).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</p>
+                    <p><strong>الوقت المحجوز:</strong> ${new Date(b.startTime).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</p>
                     <p><strong>طريقة الدفع:</strong> ${b.paymentMethod} - <strong>العربون:</strong> ${b.depositAmount} جنيه</p>
                     <p><strong>الحالة:</strong> ${statusMap[b.status] || b.status}</p>
+                    ${arrivalBtnHtml}
                     <div class="booking-actions">
                         ${b.status === 'pending_payment' ? `<button class="btn btn-small btn-success" onclick="window.approveBooking('${b.id}')">تأكيد الدفع</button>` : ''}
                         ${b.status !== 'cancelled' && b.status !== 'cancelled_noshow' && b.status !== 'completed' ? `<button class="btn btn-small btn-danger" onclick="window.cancelBooking('${b.id}')">إلغاء الحجز</button>` : ''}
@@ -536,6 +559,42 @@ window.cancelBooking = function(id) {
     }
 };
 
+window.activateBooking = function(id) {
+    const booking = globalBookings.find(b => b.id === id);
+    if (!booking) return;
+    
+    // Find an available device (priority: specific device, then any of same type)
+    let idx = -1;
+    if (booking.specificDevice && booking.specificDevice !== 'any') {
+        idx = globalConsoles.findIndex(c => c && c.name === booking.specificDevice && c.status === 'available');
+    }
+    if (idx === -1) {
+        const dbRoomName = booking.roomType === 'Main Hall' ? 'الصالة الرئيسية' : 'غرفة VIP';
+        idx = globalConsoles.findIndex(c => c && c.type === booking.deviceType && c.location === dbRoomName && c.status === 'available');
+    }
+    if (idx === -1) {
+        idx = globalConsoles.findIndex(c => c && c.type === booking.deviceType && c.status === 'available');
+    }
+    
+    if (idx === -1) {
+        alert('لا يوجد جهاز متاح من هذا النوع حالياً! تحقق من إدارة الأجهزة.');
+        return;
+    }
+    
+    const now = Date.now();
+    const durationMs = booking.duration * 3600 * 1000; // المدة كاملة من الآن
+    const endTime = now + durationMs;
+    
+    updateConsoleField(idx, {
+        status: 'busy',
+        activeTimer: { endTime, bookingId: id }
+    });
+    update(ref(db, `bookings/${id}`), {
+        status: 'active_in_store',
+        actualStartTime: now  // وقت البدء الفعلي
+    });
+};
+
 window.switchTab = function(tab) {
     const devicesTab = document.getElementById('devices-tab');
     const bookingsTab = document.getElementById('bookings-tab');
@@ -586,31 +645,17 @@ setInterval(() => {
         });
     }
 
-    // Auto-activate bookings
+    // Auto no-show cancellation (only if admin didn't manually start the booking)
     if (window._isAdmin) {
         globalBookings.forEach(b => {
             if (b.status === 'approved') {
                 const gracePeriodMs = (b.duration / 2) * 3600 * 1000;
                 const noShowTime = b.startTime + gracePeriodMs;
+                // Auto-cancel only after grace period - admin must manually press "بدء الحجز" button
                 if (now >= noShowTime) {
                     update(ref(db, `bookings/${b.id}`), { status: 'cancelled_noshow' });
-                } else if (now >= b.startTime) {
-                    let idx = -1;
-                    if (b.specificDevice && b.specificDevice !== 'any') {
-                        idx = globalConsoles.findIndex(c => c && c.name === b.specificDevice && c.status === 'available');
-                    }
-                    if (idx === -1) idx = globalConsoles.findIndex(c => c && c.type === b.deviceType && c.status === 'available');
-                    if (idx !== -1) {
-                        const durationMs = (b.duration / 2) * 3600 * 1000;
-                        updateConsoleField(idx, { status: 'busy', activeTimer: { endTime: now + durationMs, bookingId: b.id } });
-                        update(ref(db, `bookings/${b.id}`), { status: 'active_in_store' });
-                    }
                 }
-            } else if (b.status === 'active_in_store') {
-                const bEndTime = b.startTime + (b.duration * 3600 * 1000);
-                if (now >= bEndTime) {
-                    update(ref(db, `bookings/${b.id}`), { status: 'completed' });
-                }
+                // Do NOT auto-activate anymore - admin presses button manually when client arrives
             }
         });
     }
