@@ -106,39 +106,60 @@ function updateTimeSlotsDropdown() {
     const base = getWorkingDayBaseDate();
     let hasAvailableSlots = false;
     
-    // Slots from 12:00 (noon) to 02:00 AM of the next morning.
-    // H represents hours from 12 to 26 (24 = 12 AM next day, 25 = 1 AM, 26 = 2 AM)
-    for (let H = 12; H <= 26; H++) {
+    // Collect all slot times (fixed + dynamic from existing bookings)
+    const slotTimesSet = new Set();
+    
+    // 1. Fixed half-hour slots
+    for (let H = 12; H <= 26; H += 0.5) {
         const slotDate = new Date(base.getTime());
-        let hour = H;
-        if (H >= 24) {
+        let hour = Math.floor(H);
+        let minute = (H % 1) === 0.5 ? 30 : 0;
+        if (hour >= 24) {
             slotDate.setDate(slotDate.getDate() + 1);
-            hour = H - 24;
+            hour -= 24;
         }
-        slotDate.setHours(hour, 0, 0, 0);
-        const slotTime = slotDate.getTime();
-        
+        slotDate.setHours(hour, minute, 0, 0);
+        slotTimesSet.add(slotDate.getTime());
+    }
+
+    // 2. Dynamic slots from end times of active/approved bookings
+    globalBookings.forEach(b => {
+        if (b.status === 'approved' || b.status === 'active_in_store') {
+            const bEnd = b.startTime + b.duration * 3600 * 1000;
+            slotTimesSet.add(bEnd);
+        }
+    });
+
+    // Sort the times
+    const sortedSlotTimes = Array.from(slotTimesSet).sort((a, b) => a - b);
+
+    sortedSlotTimes.forEach(slotTime => {
         // Don't show past slots
-        if (slotTime < Date.now() - 10 * 60 * 1000) { // 10 mins grace period
-            continue;
+        if (slotTime < Date.now() - 10 * 60 * 1000) {
+            return;
         }
-        
+
         // Format label
-        let labelHour = hour;
+        const dateObj = new Date(slotTime);
+        const hour24 = dateObj.getHours();
+        const minute = dateObj.getMinutes();
+        
+        let labelHour = hour24;
         let period = 'م';
-        if (hour === 0) {
+        if (hour24 === 0) {
             labelHour = 12;
             period = 'منتصف الليل';
-        } else if (hour === 12) {
+        } else if (hour24 === 12) {
             labelHour = 12;
             period = 'ظهراً';
-        } else if (hour > 12) {
-            labelHour = hour - 12;
+        } else if (hour24 > 12) {
+            labelHour = hour24 - 12;
             period = 'مساءً';
         } else {
             period = 'صباحاً';
         }
-        const labelStr = `${labelHour.toString().padStart(2, '0')}:00 ${period}`;
+        const minuteStr = minute.toString().padStart(2, '0');
+        const labelStr = `${labelHour.toString().padStart(2, '0')}:${minuteStr} ${period}`;
         
         const available = isSlotAvailable(slotTime, duration, deviceType, specificDevice, roomType);
         
@@ -149,7 +170,7 @@ function updateTimeSlotsDropdown() {
             timeSel.appendChild(opt);
             hasAvailableSlots = true;
         }
-    }
+    });
     
     if (!hasAvailableSlots) {
         const opt = document.createElement('option');
@@ -312,8 +333,7 @@ function renderAdminBookings() {
             // احتساب المبالغ: الحجوزات المؤكدة، النشطة، المكتملة، والملغاة لعدم الحضور (دفعوا العربون)
             if (b.status === 'approved' || b.status === 'active_in_store' || b.status === 'completed' || b.status === 'cancelled_noshow') {
                 dayTotalHours += b.duration;
-                const price = PRICES[b.deviceType] || 50;
-                dayTotalMoney += (price * b.duration);
+                dayTotalMoney += (b.depositAmount || 0);
             }
         });
         
@@ -558,8 +578,8 @@ window.approveBooking = function(id) {
 };
 
 window.cancelBooking = function(id) {
-    if (confirm("هل أنت متأكد من إلغاء هذا الحجز؟")) {
-        update(ref(db, `bookings/${id}`), { status: 'cancelled' });
+    if (confirm("هل أنت متأكد من إلغاء هذا الحجز وحذفه نهائياً؟")) {
+        set(ref(db, `bookings/${id}`), null);
     }
 };
 
