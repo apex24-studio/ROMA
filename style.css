@@ -45,6 +45,33 @@ h1, h2, h3 {
     font-family: 'Orbitron', sans-serif;
 }
 
+.highlight-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    direction: ltr;
+}
+
+.hero-logo-img {
+    height: 48px;
+    width: 48px;
+    object-fit: cover;
+    border-radius: 50%;
+    filter: drop-shadow(0 0 8px rgba(0, 210, 255, 0.6));
+    animation: hero-logo-pulse 2s infinite ease-in-out;
+}
+
+@keyframes hero-logo-pulse {
+    0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 8px rgba(0, 210, 255, 0.6));
+    }
+    50% {
+        transform: scale(1.05);
+        filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.9));
+    }
+}
+
 /* Buttons */
 .btn {
     display: inline-block;
@@ -99,6 +126,17 @@ h1, h2, h3 {
     color: white;
     text-decoration: none;
     letter-spacing: 2px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-logo-img {
+    height: 32px;
+    width: 32px;
+    object-fit: cover;
+    border-radius: 50%;
+    filter: drop-shadow(0 0 5px rgba(0, 210, 255, 0.5));
 }
 
 .logo span {
@@ -413,4 +451,85 @@ h1, h2, h3 {
     .booking-wrapper {
         flex-direction: column;
     }
+}
+
+/* Day folders in booking management */
+.day-folder {
+    margin-bottom: 20px;
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    background: var(--glass-bg);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.day-folder-header {
+    background: rgba(255, 255, 255, 0.04);
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    gap: 15px;
+    transition: background 0.3s ease;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.day-folder-header:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.day-folder-header .folder-icon {
+    color: var(--accent-neon);
+    font-size: 1.25rem;
+}
+
+.day-folder-header span {
+    font-weight: bold;
+    flex-grow: 1;
+    font-size: 1.1rem;
+}
+
+.day-folder-header .count-badge {
+    background: var(--accent-blue);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-family: 'Cairo', sans-serif;
+    font-weight: bold;
+}
+
+.day-folder-header .arrow-icon {
+    font-size: 0.95rem;
+    transition: transform 0.3s ease;
+    color: var(--text-muted);
+}
+
+.day-folder-content {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-height: 2500px;
+    transition: max-height 0.4s ease-in-out, padding 0.4s ease;
+}
+
+/* Collapsed state */
+.day-folder.collapsed {
+    border-color: rgba(255, 255, 255, 0.04);
+}
+
+.day-folder.collapsed .day-folder-header {
+    border-bottom: none;
+}
+
+.day-folder.collapsed .day-folder-content {
+    max-height: 0;
+    padding: 0 20px;
+    overflow: hidden;
+}
+
+.day-folder.collapsed .day-folder-header .arrow-icon {
+    transform: rotate(-90deg);
 }

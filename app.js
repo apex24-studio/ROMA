@@ -34,6 +34,12 @@ function formatTimeLeft(endTime) {
     return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
 }
 
+function getDayKey(timestamp) {
+    if (!timestamp) return "حجوزات غير محددة التاريخ";
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 function updateSpecificDeviceDropdown() {
     const sel = document.getElementById('specific-device');
     const typeEl = document.getElementById('device-type');
@@ -119,11 +125,25 @@ function renderAdminBookings() {
     const container = document.getElementById('admin-bookings-list');
     if (!container) return;
     container.innerHTML = '';
-    const sorted = [...globalBookings].sort((a, b) => b.createdAt - a.createdAt);
-    if (sorted.length === 0) {
+    
+    if (globalBookings.length === 0) {
         container.innerHTML = '<p class="text-muted">لا توجد حجوزات حالياً.</p>';
         return;
     }
+    
+    // Sort bookings by startTime ascending
+    const sorted = [...globalBookings].sort((a, b) => a.startTime - b.startTime);
+    
+    // Group bookings by day
+    const groups = {};
+    sorted.forEach(b => {
+        const dayKey = getDayKey(b.startTime);
+        if (!groups[dayKey]) {
+            groups[dayKey] = [];
+        }
+        groups[dayKey].push(b);
+    });
+    
     const statusMap = {
         'pending_payment': '<span style="color:var(--accent-neon)">في انتظار الدفع</span>',
         'approved': '<span style="color:var(--success)">مؤكد (تم الدفع)</span>',
@@ -131,21 +151,62 @@ function renderAdminBookings() {
         'cancelled_noshow': '<span style="color:var(--danger)">ملغي (لم يحضر)</span>',
         'active_in_store': '<span style="color:var(--success)">نشط الآن</span>'
     };
-    sorted.forEach(b => {
-        const card = document.createElement('div');
-        card.className = 'booking-card';
-        card.innerHTML = `
-            <h4>${b.name} - ${b.deviceType} (${b.duration} ساعة)</h4>
-            <p><strong>الوقت:</strong> ${new Date(b.startTime).toLocaleString('ar-EG')}</p>
-            <p><strong>الجهاز المطلوب:</strong> ${b.specificDevice && b.specificDevice !== 'any' ? b.specificDevice : 'أي جهاز متاح'}</p>
-            <p><strong>طريقة الدفع:</strong> ${b.paymentMethod} - <strong>العربون:</strong> ${b.depositAmount} جنيه</p>
-            <p><strong>الحالة:</strong> ${statusMap[b.status] || b.status}</p>
-            <div class="booking-actions">
-                ${b.status === 'pending_payment' ? `<button class="btn btn-small btn-success" onclick="window.approveBooking('${b.id}')">تأكيد الدفع</button>` : ''}
-                ${b.status !== 'cancelled' && b.status !== 'cancelled_noshow' ? `<button class="btn btn-small btn-danger" onclick="window.cancelBooking('${b.id}')">إلغاء الحجز</button>` : ''}
-            </div>
+    
+    // Sort day keys chronologically based on the first booking's start time in each day
+    const sortedDayKeys = Object.keys(groups).sort((a, b) => {
+        return groups[a][0].startTime - groups[b][0].startTime;
+    });
+    
+    sortedDayKeys.forEach(dayKey => {
+        const bookingsInDay = groups[dayKey];
+        const folder = document.createElement('div');
+        folder.className = 'day-folder';
+        
+        // Header
+        const header = document.createElement('div');
+        header.className = 'day-folder-header';
+        header.innerHTML = `
+            <i class="fas fa-folder-open folder-icon"></i>
+            <span>${dayKey}</span>
+            <span class="count-badge">${bookingsInDay.length} حجز</span>
+            <i class="fas fa-chevron-down arrow-icon"></i>
         `;
-        container.appendChild(card);
+        
+        // Toggle collapse
+        header.addEventListener('click', () => {
+            folder.classList.toggle('collapsed');
+            const icon = header.querySelector('.folder-icon');
+            if (folder.classList.contains('collapsed')) {
+                icon.className = 'fas fa-folder folder-icon';
+            } else {
+                icon.className = 'fas fa-folder-open folder-icon';
+            }
+        });
+        
+        // Content container
+        const content = document.createElement('div');
+        content.className = 'day-folder-content';
+        
+        bookingsInDay.forEach(b => {
+            const card = document.createElement('div');
+            card.className = 'booking-card';
+            card.innerHTML = `
+                <h4>${b.name} - ${b.deviceType} (${b.duration} ساعة)</h4>
+                <p><strong>الوقت:</strong> ${new Date(b.startTime).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</p>
+                <p><strong>الجهاز المطلوب:</strong> ${b.specificDevice && b.specificDevice !== 'any' ? b.specificDevice : 'أي جهاز متاح'}</p>
+                <p><strong>طريقة الدفع:</strong> ${b.paymentMethod} - <strong>العربون:</strong> ${b.depositAmount} جنيه</p>
+                <p><strong>الحالة:</strong> ${statusMap[b.status] || b.status}</p>
+                <div class="booking-actions">
+                    ${b.status === 'pending_payment' ? `<button class="btn btn-small btn-success" onclick="window.approveBooking('${b.id}')">تأكيد الدفع</button>` : ''}
+                    ${b.status !== 'cancelled' && b.status !== 'cancelled_noshow' ? `<button class="btn btn-small btn-danger" onclick="window.cancelBooking('${b.id}')">إلغاء الحجز</button>` : ''}
+                </div>
+            `;
+            content.appendChild(card);
+        });
+        
+        folder.appendChild(header);
+        folder.appendChild(content);
+        container.appendChild(folder);
     });
 }
 window.renderAdminBookings = renderAdminBookings;
@@ -216,6 +277,21 @@ setInterval(() => {
             }
         }
     });
+
+    // Auto-release expired timers
+    if (db && ref && set && globalConsoles.length > 0) {
+        globalConsoles.forEach((c, index) => {
+            if (c && c.status === 'busy' && c.activeTimer && c.activeTimer.endTime) {
+                if (now >= c.activeTimer.endTime) {
+                    const consoleRef = ref(db, 'consoles/' + index);
+                    set(consoleRef, { ...c, status: 'available', activeTimer: null }).catch(err => {
+                        console.warn("Failed to auto-release console:", err);
+                    });
+                }
+            }
+        });
+    }
+
     // Auto-activate bookings
     if (window._isAdmin) {
         globalBookings.forEach(b => {
@@ -319,6 +395,17 @@ window.initApp = function(firebaseServices) {
         if (snap.exists()) {
             const data = snap.val();
             globalBookings = Object.keys(data).map(k => ({ id: k, ...data[k] }));
+
+            // Auto-cleanup bookings older than 7 days
+            const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            globalBookings.forEach(b => {
+                const bookingTime = b.createdAt || b.startTime;
+                if (bookingTime && bookingTime < oneWeekAgo) {
+                    set(ref(db, `bookings/${b.id}`), null).catch(err => {
+                        console.warn("Failed to auto-delete old booking:", err);
+                    });
+                }
+            });
         } else {
             globalBookings = [];
         }
