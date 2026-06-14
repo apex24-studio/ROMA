@@ -344,22 +344,41 @@ function renderAdminBookings() {
         const content = document.createElement('div');
         content.className = 'day-folder-content';
         
+        const deviceGroups = {};
         bookingsInDay.forEach(b => {
-            const card = document.createElement('div');
-            card.className = 'booking-card';
-            card.innerHTML = `
-                <h4>${b.name} - ${b.deviceType} (${b.duration} ساعة)</h4>
-                <p><strong>رقم الهاتف:</strong> <a href="tel:${b.phone || ''}" style="color: var(--accent-neon); text-decoration: none; font-weight: bold;">${b.phone || 'غير مسجل'}</a> ${b.phone ? `<a href="https://wa.me/${b.phone.startsWith('0') ? '20' + b.phone.substring(1) : b.phone}" target="_blank" style="margin-right: 15px; color: #25D366; text-decoration: none; font-weight: bold;"><i class="fab fa-whatsapp"></i> واتساب</a>` : ''}</p>
-                <p><strong>الوقت:</strong> ${new Date(b.startTime).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</p>
-                <p><strong>الجهاز المطلوب:</strong> ${b.specificDevice && b.specificDevice !== 'any' ? b.specificDevice : 'أي جهاز متاح'}</p>
-                <p><strong>طريقة الدفع:</strong> ${b.paymentMethod} - <strong>العربون:</strong> ${b.depositAmount} جنيه</p>
-                <p><strong>الحالة:</strong> ${statusMap[b.status] || b.status}</p>
-                <div class="booking-actions">
-                    ${b.status === 'pending_payment' ? `<button class="btn btn-small btn-success" onclick="window.approveBooking('${b.id}')">تأكيد الدفع</button>` : ''}
-                    ${b.status !== 'cancelled' && b.status !== 'cancelled_noshow' && b.status !== 'completed' ? `<button class="btn btn-small btn-danger" onclick="window.cancelBooking('${b.id}')">إلغاء الحجز</button>` : ''}
-                </div>
-            `;
-            content.appendChild(card);
+            const groupKey = (b.specificDevice && b.specificDevice !== 'any') 
+                ? b.specificDevice 
+                : `جهاز غير محدد (${b.deviceType} - ${b.roomType === 'Main Hall' ? 'الصالة الرئيسية' : 'غرفة VIP'})`;
+            
+            if (!deviceGroups[groupKey]) deviceGroups[groupKey] = [];
+            deviceGroups[groupKey].push(b);
+        });
+
+        Object.keys(deviceGroups).forEach(deviceKey => {
+            const groupHeader = document.createElement('h4');
+            groupHeader.style.color = 'var(--accent-neon)';
+            groupHeader.style.margin = '15px 0 10px 0';
+            groupHeader.style.borderBottom = '1px solid var(--glass-border)';
+            groupHeader.style.paddingBottom = '5px';
+            groupHeader.innerHTML = `<i class="fas fa-desktop"></i> ${deviceKey}`;
+            content.appendChild(groupHeader);
+            
+            deviceGroups[deviceKey].forEach(b => {
+                const card = document.createElement('div');
+                card.className = 'booking-card';
+                card.innerHTML = `
+                    <h4>${b.name} (${b.duration} ساعة)</h4>
+                    <p><strong>رقم الهاتف:</strong> <a href="tel:${b.phone || ''}" style="color: var(--accent-neon); text-decoration: none; font-weight: bold;">${b.phone || 'غير مسجل'}</a> ${b.phone ? `<a href="https://wa.me/${b.phone.startsWith('0') ? '20' + b.phone.substring(1) : b.phone}" target="_blank" style="margin-right: 15px; color: #25D366; text-decoration: none; font-weight: bold;"><i class="fab fa-whatsapp"></i> واتساب</a>` : ''}</p>
+                    <p><strong>الوقت:</strong> ${new Date(b.startTime).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}</p>
+                    <p><strong>طريقة الدفع:</strong> ${b.paymentMethod} - <strong>العربون:</strong> ${b.depositAmount} جنيه</p>
+                    <p><strong>الحالة:</strong> ${statusMap[b.status] || b.status}</p>
+                    <div class="booking-actions">
+                        ${b.status === 'pending_payment' ? `<button class="btn btn-small btn-success" onclick="window.approveBooking('${b.id}')">تأكيد الدفع</button>` : ''}
+                        ${b.status !== 'cancelled' && b.status !== 'cancelled_noshow' && b.status !== 'completed' ? `<button class="btn btn-small btn-danger" onclick="window.cancelBooking('${b.id}')">إلغاء الحجز</button>` : ''}
+                    </div>
+                `;
+                content.appendChild(card);
+            });
         });
         
         folder.appendChild(header);
