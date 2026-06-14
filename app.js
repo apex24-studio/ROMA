@@ -94,9 +94,9 @@ function updateTimeSlotsDropdown() {
     const roomTypeEl = document.getElementById('room-type');
     const durationEl = document.getElementById('duration');
     
-    if (!timeSel || !deviceTypeEl || !roomTypeEl || !durationEl) return;
+    if (!timeSel || !roomTypeEl || !durationEl) return;
     
-    const deviceType = deviceTypeEl.value;
+    const deviceType = deviceTypeEl ? deviceTypeEl.value : 'PS4';
     const specificDevice = specificDeviceEl ? specificDeviceEl.value : 'any';
     const roomType = roomTypeEl.value;
     const durationRaw = durationEl.value;
@@ -219,8 +219,8 @@ function updateSpecificDeviceDropdown() {
     const sel = document.getElementById('specific-device');
     const typeEl = document.getElementById('device-type');
     const roomEl = document.getElementById('room-type');
-    if (!sel || !typeEl) return;
-    const selectedType = typeEl.value;
+    if (!sel) return;
+    const selectedType = typeEl ? typeEl.value : 'PS4';
     const selectedRoom = roomEl ? roomEl.value : null;
     
     // Map dropdown value directly
@@ -838,7 +838,7 @@ function updatePaymentInstructions() {
     const durationEl = document.getElementById('duration');
     if (!methodEl || !instructionsEl) return;
     const method = methodEl.value;
-    const deviceType = deviceTypeEl ? deviceTypeEl.value : 'PS5';
+    const deviceType = deviceTypeEl ? deviceTypeEl.value : 'PS4';
     const durationRaw = durationEl ? durationEl.value : '1';
     const duration = durationRaw === 'open' ? 1 : parseFloat(durationRaw) || 1;
     const deposit = (PRICES[deviceType] || 50) * duration / 2;
@@ -983,7 +983,8 @@ window.initApp = function(firebaseServices) {
             e.preventDefault();
             const name = document.getElementById('name').value;
             const phone = document.getElementById('phone').value;
-            const deviceType = document.getElementById('device-type').value;
+            const deviceTypeEl = document.getElementById('device-type');
+            const deviceType = deviceTypeEl ? deviceTypeEl.value : 'PS4';
             const specificDevice = document.getElementById('specific-device') ? document.getElementById('specific-device').value : 'any';
             const roomType = document.getElementById('room-type').value;
             const timeVal = document.getElementById('time').value;
